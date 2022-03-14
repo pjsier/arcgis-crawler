@@ -1,159 +1,71 @@
 use anyhow::{self, Result};
+use itertools::EitherOrBoth::{Both, Right};
+use itertools::Itertools;
+use ptree::{print_tree, TreeBuilder};
 
 use crate::nodes::ServerNode;
 
-#[derive(Debug, Default)]
-struct NodeTree {
-    tree: BTreeMap<String, NodeTree>,
-}
+pub fn print_node_tree(url: String, nodes: Vec<ServerNode>) -> Result<()> {
+    let mut nodes = nodes.clone();
+    nodes.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-impl NodeTree {
-    pub fn insert(&mut self, path: Vec<String>) {
-        let mut cur = self;
-        for p in path.iter() {
-            cur = cur.tree.entry(p).or_insert_with(NodeTree::default)
-        }
-    }
+    let mut tree_builder = TreeBuilder::new(url.to_string());
+    let mut nodes_iter = nodes.clone().into_iter().peekable();
 
-    pub fn _print(&self, top: bool, parent: Vec<String>) {
-        let normal_prefix = format!("{}│   ", prefix);
-        let last_prefix = format!("{}    ", prefix);
-
-        for (idx, (path, it)) in self.tree.iter().enumerate() {
-            let current_path = parent_path.join(path);
-            let style = ansi_style_for_path(&lscolors, &current_path);
-
-            let contains_singleton_dir = it.contains_singleton_dir();
-
-            let painted = match full_path {
-                false => style.paint(path.to_string_lossy()),
-                true => match contains_singleton_dir && !join_with_parent {
-                    false => style.paint(current_path.to_string_lossy()),
-                    true => style.paint(""),
-                },
-            };
-
-            // If this folder only contains a single dir, we skip printing it because it will be
-            // picked up and printed on the next iteration. If this is a full path (even if it
-            // contains more than one directory), we also want to skip printing, because the full
-            // path will be printed all at once (see painted above), not part by part.
-            // If this is a full path however the prefix must be printed at the very beginning.
-            let should_print = (contains_singleton_dir && !join_with_parent)
-                || !contains_singleton_dir
-                || !full_path;
-
-            let newline = if contains_singleton_dir { "" } else { "\n" };
-            let is_last = idx == self.trie.len() - 1;
-
-            if !is_last {
-                if should_print {
-                    print!("{}├── {}{}", prefix, painted, newline);
-                }
-                &normal_prefix
+    // Set up first node without a pair
+    if let Some(node) = nodes.clone().first() {
+        let mut node_iter = node.clone().0.into_iter().peekable();
+        while let Some(node_value) = node_iter.next() {
+            let is_last = node_iter.peek().is_none();
+            if is_last {
+                tree_builder.add_empty_child(node_value);
             } else {
-                if should_print {
-                    print!("{}└── {}{}", prefix, painted, newline);
-                }
-                &last_prefix
-            };
-
-            it._print(
-                false,
-                next_prefix,
-                contains_singleton_dir,
-                lscolors,
-                current_path,
-                full_path,
-            )
+                tree_builder.begin_child(node_value);
+            }
         }
     }
 
-    pub fn print(&self) {}
-}
-
-fn print(nodes: Vec<ServerNode>) -> Result<()> {
-    let mut nodes = nodes;
-    nodes.sort();
-
-    let mut tree = NodeTree::default();
-    for node in nodes {
-        tree.insert(node.0);
+    while let Some(node) = nodes_iter.next() {
+        let default_node = ServerNode(vec![]);
+        let peek_node = &*nodes_iter.peek().unwrap_or(&default_node);
+        let node_len = node.0.len();
+        let mut pair_iter = node
+            .0
+            .into_iter()
+            .zip_longest(peek_node.clone().0.into_iter())
+            .enumerate()
+            .peekable();
+        let mut is_same = true;
+        while let Some(pair) = pair_iter.next() {
+            let is_last = pair_iter.peek().is_none();
+            match pair {
+                (idx, Both(left, right)) => {
+                    if is_same && !is_last && left != right {
+                        for _ in idx..(node_len - 1) {
+                            tree_builder.end_child();
+                        }
+                        is_same = false;
+                    }
+                    if is_last {
+                        tree_builder.add_empty_child(right);
+                    } else if !is_same || left != right {
+                        tree_builder.begin_child(right);
+                    }
+                }
+                (_, Right(right)) => {
+                    if is_last {
+                        tree_builder.add_empty_child(right);
+                    } else {
+                        tree_builder.begin_child(right);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
-    // for (idx, node) in nodes.iter().enumerate() {
+    let tree = tree_builder.build();
+    print_tree(&tree)?;
 
-    // }
     Ok(())
 }
-
-// https://github.com/jez/as-tree/blob/0036c20f66795774eb9cda3ccbae6ca1e1c19444/src/main.rs#L42-L111
-// fn _print(
-//     &self,
-//     top: bool,
-//     prefix: &str,
-//     join_with_parent: bool,
-//     lscolors: &LsColors,
-//     parent_path: PathBuf,
-//     full_path: bool,
-// ) {
-//     let normal_prefix = format!("{}│   ", prefix);
-//     let last_prefix = format!("{}    ", prefix);
-
-//     for (idx, (path, it)) in self.trie.iter().enumerate() {
-//         let current_path = parent_path.join(path);
-//         let style = ansi_style_for_path(&lscolors, &current_path);
-
-//         let contains_singleton_dir = it.contains_singleton_dir();
-
-//         let painted = match full_path {
-//             false => style.paint(path.to_string_lossy()),
-//             true => match contains_singleton_dir && !join_with_parent {
-//                 false => style.paint(current_path.to_string_lossy()),
-//                 true => style.paint(""),
-//             },
-//         };
-
-//         // If this folder only contains a single dir, we skip printing it because it will be
-//         // picked up and printed on the next iteration. If this is a full path (even if it
-//         // contains more than one directory), we also want to skip printing, because the full
-//         // path will be printed all at once (see painted above), not part by part.
-//         // If this is a full path however the prefix must be printed at the very beginning.
-//         let should_print = (contains_singleton_dir && !join_with_parent)
-//             || !contains_singleton_dir
-//             || !full_path;
-
-//         let newline = if contains_singleton_dir { "" } else { "\n" };
-//         let is_last = idx == self.trie.len() - 1;
-
-//         let next_prefix = if join_with_parent {
-//             let joiner = if full_path || top || parent_path == PathBuf::from("/") {
-//                 ""
-//             } else {
-//                 "/"
-//             };
-//             if should_print {
-//                 print!("{}{}{}", style.paint(joiner), painted, newline);
-//             }
-//             prefix
-//         } else if !is_last {
-//             if should_print {
-//                 print!("{}├── {}{}", prefix, painted, newline);
-//             }
-//             &normal_prefix
-//         } else {
-//             if should_print {
-//                 print!("{}└── {}{}", prefix, painted, newline);
-//             }
-//             &last_prefix
-//         };
-
-//         it._print(
-//             false,
-//             next_prefix,
-//             contains_singleton_dir,
-//             lscolors,
-//             current_path,
-//             full_path,
-//         )
-//     }
-// }

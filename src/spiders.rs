@@ -10,7 +10,6 @@ use crate::nodes::{ArcgisResponse, ServerNode};
 pub trait Spider: Send + Sync {
     fn start_urls(&self) -> Vec<String>;
     async fn scrape(&self, url: String) -> Result<(Vec<ServerNode>, Vec<String>)>;
-    async fn process(&self, item: ServerNode) -> Result<()>;
 }
 
 pub struct ArcgisSpider {
@@ -94,10 +93,5 @@ impl Spider for ArcgisSpider {
             .collect();
 
         Ok((nodes, urls))
-    }
-
-    async fn process(&self, item: ServerNode) -> Result<()> {
-        println!("{:?}", item);
-        Ok(())
     }
 }

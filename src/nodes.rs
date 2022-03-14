@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::cmp::{min, Ord, Ordering, PartialEq, PartialOrd};
+use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ArcgisResponse {
@@ -36,22 +36,27 @@ impl PartialEq for ServerNode {
 
 impl PartialOrd for ServerNode {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // Compare last available index so /server1/test comes before /server2
-        let compare_index = min(self.0.len(), other.0.len());
+        Some(self.0.join("-").cmp(&other.0.join("-")))
+    }
+}
 
-        if compare_index == 0 {
-            return match (self.0.len(), other.0.len()) {
-                (0, 0) => Some(Ordering::Equal),
-                (0, _) => Some(Ordering::Less),
-                (_, 0) => Some(Ordering::Greater),
-                (_, _) => None,
-            };
-        }
+#[cfg(test)]
+mod test {
+    use super::*;
 
-        if self.0.len() == other.0.len() {
-            return Some(self.0.last().cmp(&other.0.last()));
-        }
-
-        Some(self.0[compare_index].cmp(&other.0[compare_index]))
+    #[test]
+    fn test_partial_cmp() {
+        let node_1 = ServerNode(vec![
+            "BuildingLabels".to_string(),
+            "MapServer".to_string(),
+            "Parcels".to_string(),
+        ]);
+        let node_2 = ServerNode(vec![
+            "ExternalApps".to_string(),
+            "Zoning".to_string(),
+            "MapServer".to_string(),
+            "Zoning".to_string(),
+        ]);
+        assert!(matches!(node_1.partial_cmp(&node_2), Some(Ordering::Less)));
     }
 }

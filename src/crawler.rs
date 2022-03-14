@@ -31,7 +31,7 @@ impl Crawler {
     }
 
     // TODO: Restructure this so that it returns a value after the barrier finishes
-    pub async fn run(&self, spider: Arc<dyn Spider>) {
+    pub async fn run(&self, spider: Arc<dyn Spider>) -> Vec<ServerNode> {
         let mut visited_urls = HashSet::<String>::new();
         let crawler_count = self.crawler_count;
         let crawler_queue_size = crawler_count * 400;
@@ -46,11 +46,17 @@ impl Crawler {
 
         for url in spider.start_urls() {
             visited_urls.insert(url.clone());
-            // TODO: Initiates? check docs?
             let _ = urls_to_visit_tx.send(url).await;
         }
 
-        self.launch_processors(processor_count, spider.clone(), items_rx, barrier.clone());
+        let barrier_copy = barrier.clone();
+        let handle = tokio::spawn(async move {
+            let nodes: Vec<ServerNode> = tokio_stream::wrappers::ReceiverStream::new(items_rx)
+                .collect()
+                .await;
+            barrier_copy.wait().await;
+            nodes
+        });
         self.launch_scrapers(
             crawler_count,
             spider.clone(),
@@ -90,24 +96,8 @@ impl Crawler {
         drop(urls_to_visit_tx);
 
         barrier.wait().await;
-    }
 
-    fn launch_processors(
-        &self,
-        concurrency: usize,
-        spider: Arc<dyn Spider>,
-        items: mpsc::Receiver<ServerNode>,
-        barrier: Arc<Barrier>,
-    ) {
-        tokio::spawn(async move {
-            tokio_stream::wrappers::ReceiverStream::new(items)
-                .for_each_concurrent(concurrency, |item| async {
-                    let _ = spider.process(item).await;
-                })
-                .await;
-
-            barrier.wait().await;
-        });
+        handle.await.unwrap_or_else(|_| vec![])
     }
 
     fn launch_scrapers(

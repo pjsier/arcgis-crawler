@@ -2,10 +2,12 @@
 use std::{env, sync::Arc, time::Duration};
 
 mod crawler;
+mod display;
 mod nodes;
 mod spiders;
 
 use crate::crawler::Crawler;
+use crate::display::print_node_tree;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -35,7 +37,15 @@ async fn main() -> Result<(), anyhow::Error> {
     let spider = Arc::new(spiders::ArcgisSpider::new(
         "https://gisapps.cityofchicago.org/arcgis/rest/services/".to_string(),
     ));
-    crawler.run(spider).await;
+    let nodes = crawler.run(spider).await;
+
+    // for node in nodes {
+    //     println!("{:?}", node);
+    // }
+    print_node_tree(
+        "https://gisapps.cityofchicago.org/arcgis/rest/services/".to_string(),
+        nodes,
+    )?;
 
     Ok(())
 }
