@@ -6,10 +6,10 @@ use ptree::{print_tree, TreeBuilder};
 use crate::nodes::ServerNode;
 
 pub fn print_node_tree(url: String, nodes: Vec<ServerNode>) -> Result<()> {
-    let mut nodes = nodes.clone();
+    let mut nodes = nodes;
     nodes.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    let mut tree_builder = TreeBuilder::new(url.to_string());
+    let mut tree_builder = TreeBuilder::new(url);
     let mut nodes_iter = nodes.clone().into_iter().peekable();
 
     // Set up first node without a pair

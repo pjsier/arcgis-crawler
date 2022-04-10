@@ -113,31 +113,28 @@ impl Crawler {
     ) {
         tokio::spawn(async move {
             tokio_stream::wrappers::ReceiverStream::new(urls_to_visit)
-                .for_each_concurrent(concurrency, |queued_url| {
-                    let queued_url = queued_url.clone();
-                    async {
-                        active_spiders.fetch_add(1, Ordering::SeqCst);
-                        let mut urls = Vec::new();
-                        let res = spider
-                            .scrape(queued_url.clone())
-                            .await
-                            .map_err(|err| {
-                                log::error!("{}", err);
-                                err
-                            })
-                            .ok();
+                .for_each_concurrent(concurrency, |queued_url| async {
+                    active_spiders.fetch_add(1, Ordering::SeqCst);
+                    let mut urls = Vec::new();
+                    let res = spider
+                        .scrape(queued_url.clone())
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .ok();
 
-                        if let Some((items, new_urls)) = res {
-                            for item in items {
-                                let _ = items_tx.send(item).await;
-                            }
-                            urls = new_urls;
+                    if let Some((items, new_urls)) = res {
+                        for item in items {
+                            let _ = items_tx.send(item).await;
                         }
-
-                        let _ = new_urls.send((queued_url, urls)).await;
-                        sleep(delay).await;
-                        active_spiders.fetch_sub(1, Ordering::SeqCst);
+                        urls = new_urls;
                     }
+
+                    let _ = new_urls.send((queued_url, urls)).await;
+                    sleep(delay).await;
+                    active_spiders.fetch_sub(1, Ordering::SeqCst);
                 })
                 .await;
 
