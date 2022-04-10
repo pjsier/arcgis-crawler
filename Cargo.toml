@@ -2,11 +2,16 @@
 name = "arcgis-crawler"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Pat Sier <pjsier@gmail.com>"]
+description = "Crawl ArcGIS servers and report all available services"
+readme = "README.md"
+homepage = "https://github.com/pjsier/arcgis-crawler"
+repository = "https://github.com/pjsier/arcgis-crawler"
+license = "MIT"
+exclude = [".github/*"]
 
 [dependencies]
-clap = "2.33"
+clap = "3.1.6"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", default-features = false, features = ["json", "default-tls"] }
 anyhow = "1.0"
@@ -20,3 +25,7 @@ itertools = "0.10.3"
 ptree = "0.4.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+
+[[bin]]
+name = "arcgis-crawler"
+path = "src/main.rs"

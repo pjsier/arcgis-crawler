@@ -1,4 +1,4 @@
-// use clap::{App, Arg, SubCommand};
+use clap::{Arg, Command};
 use std::{env, sync::Arc, time::Duration};
 
 mod crawler;
@@ -11,41 +11,24 @@ use crate::display::print_node_tree;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // let cli = App::new(clap::crate_name!())
-    //     .version(clap::crate_version!())
-    //     .about(clap::crate_description!())
-    //     .subcommand(SubCommand::with_name("spiders").about("List all spiders"))
-    //     .subcommand(
-    //         SubCommand::with_name("run").about("Run a spider").arg(
-    //             Arg::with_name("spider")
-    //                 .short("s")
-    //                 .long("spider")
-    //                 .help("The spider to run")
-    //                 .takes_value(true)
-    //                 .required(true),
-    //         ),
-    //     )
-    //     .setting(clap::AppSettings::ArgRequiredElseHelp)
-    //     .setting(clap::AppSettings::VersionlessSubcommands)
-    //     .get_matches();
+    let cli = Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .arg(Arg::new("url").required(true).index(1))
+        .get_matches();
 
     env::set_var("RUST_LOG", "info,crawler=debug");
     env_logger::init();
 
+    // TODO: Validate that URL is valid URL
+    let url = cli.value_of("url").unwrap().to_string();
+
     let crawler = Crawler::new(Duration::from_millis(200), 2, 500);
     // TODO: rust-tls not working https://github.com/seanmonstar/reqwest/issues/1039
-    let spider = Arc::new(spiders::ArcgisSpider::new(
-        "https://gisapps.cityofchicago.org/arcgis/rest/services/".to_string(),
-    ));
+    let spider = Arc::new(spiders::ArcgisSpider::new(url.clone()));
     let nodes = crawler.run(spider).await;
 
-    // for node in nodes {
-    //     println!("{:?}", node);
-    // }
-    print_node_tree(
-        "https://gisapps.cityofchicago.org/arcgis/rest/services/".to_string(),
-        nodes,
-    )?;
+    print_node_tree(url, nodes)?;
 
     Ok(())
 }

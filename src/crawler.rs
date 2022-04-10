@@ -30,7 +30,6 @@ impl Crawler {
         }
     }
 
-    // TODO: Restructure this so that it returns a value after the barrier finishes
     pub async fn run(&self, spider: Arc<dyn Spider>) -> Vec<ServerNode> {
         let mut visited_urls = HashSet::<String>::new();
         let crawler_count = self.crawler_count;
@@ -100,6 +99,7 @@ impl Crawler {
         handle.await.unwrap_or_else(|_| vec![])
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn launch_scrapers(
         &self,
         concurrency: usize,
